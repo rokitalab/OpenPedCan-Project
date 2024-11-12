@@ -7,6 +7,7 @@
 library(tidyverse)
 library(ggplot2)
 library(cowplot)
+library(ggthemes)
 
 # Detect the ".git" folder -- this will in the project root directory.
 # Use this as the root directory to ensure proper execution, no matter where
@@ -34,6 +35,7 @@ histologies_df <- readr::read_tsv(file.path(root_dir, "data", "histologies.tsv")
   # mutate(group = case_when(cohort %in% c("TCGA", "GTEx") ~ "Adult", TRUE ~ "Pediatric")) %>%
   mutate(group = case_when(cohort == "TCGA" ~ "Adult tumors",
                            cohort == "GTEx" ~ "Adult normal", 
+                           sub_cohort == "CPTAC GBM" ~ "Adult tumors",
                            !is.na(pathology_diagnosis) & !cohort %in% c("TCGA", "GTEx") ~ "Pediatric",
                            TRUE ~ NA_character_))
 
@@ -123,7 +125,14 @@ table(exp_strategy_df$cohort, exp_strategy_df$group)
 # Create the plot for the pediatric cohort
 plot_pediatric <- ggplot(subset(exp_strategy_df, group == "Pediatric"), aes(x = cohort, fill = factor(experimental_strategy, levels = exp_level))) + 
   geom_bar() +  # Default width
-  scale_fill_manual("Experimental Strategy", values = c("darkgoldenrod2", "yellow1", "magenta2", "salmon", "darkslategray2", "blueviolet", "deeppink", "darkseagreen")) +
+  scale_fill_manual("Experimental Strategy", values = c("Methylation" = "darkgoldenrod2", 
+                                                        "miRNA-Seq" = "yellow1", 
+                                                        "Phospho-Proteomics" = "magenta2",
+                                                        "RNA-Seq" = "salmon", 
+                                                        "Targeted Sequencing" = "darkslategray2",
+                                                        "WGS" = "blueviolet", 
+                                                       "Whole Cell Proteomics"= "deeppink",
+                                                       "WXS" = "darkseagreen")) +
   coord_flip() +
   ylim(0,10000) +
   theme_Publication() +
@@ -133,7 +142,14 @@ plot_pediatric <- ggplot(subset(exp_strategy_df, group == "Pediatric"), aes(x = 
 # Create the plot for the adult tumors
 plot_adult <- ggplot(subset(exp_strategy_df, group == "Adult tumors"), aes(x = cohort, fill = factor(experimental_strategy, levels = exp_level))) + 
   geom_bar(width = 0.5) +  # Adjust the width here
-  scale_fill_manual("Experimental Strategy", values = c("salmon")) +
+  scale_fill_manual("Experimental Strategy", values = c("Methylation" = "darkgoldenrod2", 
+                                                        "miRNA-Seq" = "yellow1", 
+                                                        "Phospho-Proteomics" = "magenta2",
+                                                        "RNA-Seq" = "salmon", 
+                                                        "Targeted Sequencing" = "darkslategray2",
+                                                        "WGS" = "blueviolet", 
+                                                        "Whole Cell Proteomics"= "deeppink",
+                                                        "WXS" = "darkseagreen")) +
   coord_flip() +
   theme_Publication() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels
@@ -143,7 +159,14 @@ plot_adult <- ggplot(subset(exp_strategy_df, group == "Adult tumors"), aes(x = c
 # Create the plot for the adult cohort
 plot_adult2 <- ggplot(subset(exp_strategy_df, group == "Adult normal"), aes(x = cohort, fill = factor(experimental_strategy, levels = exp_level))) + 
   geom_bar(width = 0.5) +  # Adjust the width here
-  scale_fill_manual("Experimental Strategy", values = c("salmon")) +
+  scale_fill_manual("Experimental Strategy", values = c("Methylation" = "darkgoldenrod2", 
+                                                        "miRNA-Seq" = "yellow1", 
+                                                        "Phospho-Proteomics" = "magenta2",
+                                                        "RNA-Seq" = "salmon", 
+                                                        "Targeted Sequencing" = "darkslategray2",
+                                                        "WGS" = "blueviolet", 
+                                                        "Whole Cell Proteomics"= "deeppink",
+                                                        "WXS" = "darkseagreen")) +
   coord_flip() +
   theme_Publication() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels
@@ -151,7 +174,7 @@ plot_adult2 <- ggplot(subset(exp_strategy_df, group == "Adult normal"), aes(x = 
 
 # Combine the plots into one
 combined_plot <- plot_grid(plot_pediatric, plot_adult, plot_adult2, 
-                           ncol = 1, align = "v", rel_heights = c(2, 1.3, 1.3)  # Adjust relative heights
+                           ncol = 1, align = "v", rel_heights = c(2, 1.3, 1.1)  # Adjust relative heights
 )
 
 # Display the combined plot
