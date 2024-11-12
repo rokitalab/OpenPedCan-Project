@@ -9,11 +9,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Zhuangzhuang Geng" />
+<meta name="author" content="Jo Lynne Rokita" />
 
-<meta name="date" content="2023-12-06" />
+<meta name="date" content="2024-11-12" />
 
-<title>01-molecular-subtype-pineoblastoma</title>
+<title>Pineoblastoma UMAP</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -350,40 +350,38 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">01-molecular-subtype-pineoblastoma</h1>
-<h4 class="author">Zhuangzhuang Geng</h4>
-<h4 class="date">2023-12-06</h4>
+<h1 class="title toc-ignore">Pineoblastoma UMAP</h1>
+<h4 class="author">Jo Lynne Rokita</h4>
+<h4 class="date">2024-11-12</h4>
 
 </div>
 
 
-<div id="load-library" class="section level2">
-<h2>load library</h2>
-<pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## ── Attaching core tidyverse packages ───────────────────────────────────────── tidyverse 2.0.0 ──
-## ✔ dplyr     1.1.4     ✔ readr     2.1.5
-## ✔ forcats   1.0.0     ✔ stringr   1.5.1
-## ✔ ggplot2   3.5.1     ✔ tibble    3.2.1
-## ✔ lubridate 1.9.3     ✔ tidyr     1.3.1
-## ✔ purrr     1.0.2     
-## ── Conflicts ─────────────────────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()
-## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
-</div>
-<div id="set-directories" class="section level2">
-<h2>set directories</h2>
-<pre class="r"><code>root_dir &lt;- rprojroot::find_root(rprojroot::has_dir(&quot;.git&quot;))
+<p>Load libraries and set directory paths</p>
+<pre class="r"><code>suppressPackageStartupMessages({
+  library(tidyverse)
+  library(umap)
+  library(ggplot2)
+  library(devtools)
+  library(gdata)
+  library(ggpubr)
+  library(patchwork)
+})
+
+root_dir &lt;- rprojroot::find_root(rprojroot::has_dir(&quot;.git&quot;))
+
 data_dir &lt;- file.path(root_dir, &quot;data&quot;)
 analysis_dir &lt;- file.path(root_dir, &quot;analyses&quot;, &quot;molecular-subtyping-PB&quot;)
-result_dir &lt;- file.path(analysis_dir, &quot;results&quot;)
-if(!dir.exists(result_dir)){
-  dir.create(result_dir)
-}</code></pre>
-</div>
-<div id="read-files" class="section level2">
-<h2>read files</h2>
-<pre class="r"><code>histo &lt;- readr::read_tsv(file.path(data_dir, &quot;histologies-base.tsv&quot;))</code></pre>
+results_dir &lt;- file.path(analysis_dir, &quot;results&quot;)
+plots_dir &lt;- file.path(analysis_dir, &quot;plot&quot;)
+
+source(file.path(root_dir, &quot;figures&quot;, &quot;manuscript_OPC&quot;, &quot;utils&quot;, &quot;theme_for_plot.R&quot;))</code></pre>
+<p>Set file paths</p>
+<pre class="r"><code>hist_file &lt;- file.path(data_dir, &quot;histologies-base.tsv&quot;)
+subtype_file &lt;- file.path(results_dir, &quot;pineo-molecular-subtypes.tsv&quot;)
+methyl_file &lt;- file.path(data_dir, &quot;methyl-beta-values.rds&quot;)</code></pre>
+<p>Wrangle data.</p>
+<pre class="r"><code>hist &lt;- read_tsv(hist_file)</code></pre>
 <pre><code>## Rows: 47895 Columns: 64
 ## ── Column specification ─────────────────────────────────────────────────────────────────────────
 ## Delimiter: &quot;\t&quot;
@@ -393,105 +391,70 @@ if(!dir.exists(result_dir)){
 ## 
 ## ℹ Use `spec()` to retrieve the full column specification for this data.
 ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
-<pre class="r"><code>## json file
-path_dx_list_pb &lt;- jsonlite::fromJSON(
-  file.path(analysis_dir, &quot;PB-subset&quot;,  
-            &quot;PB_subtyping_path_dx_strings.json&quot;)
-)</code></pre>
-</div>
-<div id="select-pb-samples-from-histologies" class="section level2">
-<h2>select PB samples from histologies</h2>
-<pre class="r"><code>pb_meta &lt;- histo %&gt;% 
-  filter(pathology_diagnosis %in% path_dx_list_pb$exact_path_dx | 
-           pathology_free_text_diagnosis %in% path_dx_list_pb$path_free_text_exact) %&gt;% 
-  mutate(molecular_subtype_methyl = case_when(
-    dkfz_v12_methylation_subclass == &quot;PB_FOXR2&quot; ~ &quot;PB, MYC/FOXR2&quot;, 
-    dkfz_v12_methylation_subclass == &quot;PIN_RB&quot; ~ &quot;PB, RB1&quot;,
-    dkfz_v12_methylation_subclass == &quot;PB_GRP1A&quot; ~ &quot;PB, Group 1A&quot;,
-    dkfz_v12_methylation_subclass == &quot;PB_GRP1B&quot; ~ &quot;PB, Group 1B&quot;,
-    dkfz_v12_methylation_subclass == &quot;PB_GRP2&quot; ~ &quot;PB, Group 2&quot;,
-    dkfz_v12_methylation_subclass == &quot;PPTID_A&quot; ~ &quot;PB, PPTID&quot;
-    ))</code></pre>
-</div>
-<div id="there-are-four-subtypes" class="section level2">
-<h2>there are four subtypes:</h2>
-<div id="pineoblastoma-mirna-processing-altered-1-pb-group-1" class="section level3">
-<h3>pineoblastoma, miRNA processing-altered 1 (PB, Group 1)</h3>
-</div>
-<div id="pineoblastoma-mirna-processing-altered-2-pb-group-2" class="section level3">
-<h3>pineoblastoma, miRNA processing-altered 2 (PB, Group 2)</h3>
-</div>
-<div id="pineoblastoma-rb1-altered-pb-rb1" class="section level3">
-<h3>pineoblastoma, RB1-altered (PB, RB1)</h3>
-</div>
-<div id="pineoblastoma-mycfoxr2-activated-pb-mycfoxr2" class="section level3">
-<h3>pineoblastoma, MYC/FOXR2-activated (PB, MYC/FOXR2)</h3>
-</div>
-</div>
-<div id="for-now-subtyping-is-based-on-the-methylation-classification" class="section level2">
-<h2>for now, subtyping is based on the methylation classification</h2>
-</div>
-<div id="pb_foxr2-pineoblastoma-mycfoxr2-activated-pb-mycfoxr2" class="section level2">
-<h2>PB_FOXR2: pineoblastoma, MYC/FOXR2-activated (PB, MYC/FOXR2)</h2>
-</div>
-<div id="pb_grp1a-pb_grp1b-pineoblastoma-mirna-processing-altered-1-pb-group-1" class="section level2">
-<h2>PB_GRP1A, PB_GRP1B: pineoblastoma, miRNA processing-altered 1 (PB,
-Group 1)</h2>
-</div>
-<div id="pb_grp2-pineoblastoma-mirna-processing-altered-2-pb-group-2" class="section level2">
-<h2>PB_GRP2: pineoblastoma, miRNA processing-altered 2 (PB, Group
-2)</h2>
-</div>
-<div id="pin_rb-pineoblastoma-rb1-altered-pb-rb1" class="section level2">
-<h2>PIN_RB: pineoblastoma, RB1-altered (PB, RB1)</h2>
-</div>
-<div id="additional-subtypes-added-on-07222024" class="section level2">
-<h2>Additional subtypes added on 07/22/2024</h2>
-</div>
-<div id="edited-by-sangeeta-shukla" class="section level2">
-<h2>Edited By: Sangeeta Shukla</h2>
-</div>
-<div id="pptid_a-pineal-parenchymal-tumor-of-intermediate-differentiation-type-a" class="section level2">
-<h2>PPTID_A: Pineal Parenchymal Tumor of Intermediate Differentiation
-Type A</h2>
-<pre class="r"><code>pb_methy_with_subtype &lt;- pb_meta %&gt;% 
-  filter(experimental_strategy == &quot;Methylation&quot; &amp; dkfz_v12_methylation_subclass_score &gt;= 0.8) %&gt;% 
-  mutate(molecular_subtype = case_when(molecular_subtype_methyl == &quot;PB, MYC/FOXR2&quot; ~ &quot;PB, MYC/FOXR2&quot;, 
-                                       molecular_subtype_methyl == &quot;PB, RB1&quot; ~ &quot;PB, RB1&quot;,
-                                       molecular_subtype_methyl %in% c(&quot;PB, Group 1A&quot;, &quot;PB, Group 1B&quot;) ~ &quot;PB, Group 1&quot;,
-                                       molecular_subtype_methyl == &quot;PB, Group 2&quot; ~ &quot;PB, Group 2&quot;,
-                                       molecular_subtype_methyl == &quot;PPTID&quot; ~ &quot;PB, PPTID&quot;
-                                       ))
-  
+<p>Filter hist for methyl samples, and append to subtype df</p>
+<pre class="r"><code>hist_methyl &lt;- hist %&gt;%
+  dplyr::filter(pathology_diagnosis == &quot;Pineoblastoma&quot;,
+                experimental_strategy == &quot;Methylation&quot;,
+                grepl(&quot;PB_&quot;, dkfz_v12_methylation_subclass)) 
 
-pb_methy_without_subtype &lt;- pb_meta %&gt;% 
-  filter(experimental_strategy == &quot;Methylation&quot; &amp; 
-           !(Kids_First_Biospecimen_ID %in% pb_methy_with_subtype$Kids_First_Biospecimen_ID)) %&gt;%
-  mutate(molecular_subtype_methyl = NA_character_)
+subtypes &lt;- read_tsv(subtype_file) %&gt;%
+  filter(!is.na(molecular_subtype_methyl),
+         Kids_First_Biospecimen_ID %in% hist_methyl$Kids_First_Biospecimen_ID) %&gt;%
+  # remove anything not PB and also the to be classified sample
+  # update one with germline pathogenic variant (GPV) reported in Fiorca, et al 2024
+  mutate(molecular_subtype = case_when(Kids_First_Biospecimen_ID == &quot;BS_SG2X2XQB&quot; ~ paste0(molecular_subtype, &quot; + DROSHA GPV&quot;),
+         TRUE ~ molecular_subtype),
+         molecular_subtype_methyl = case_when(Kids_First_Biospecimen_ID == &quot;BS_SG2X2XQB&quot; ~ paste0(molecular_subtype_methyl, &quot; + DROSHA GPV&quot;),
+         TRUE ~ molecular_subtype_methyl))</code></pre>
+<pre><code>## Rows: 70 Columns: 6
+## ── Column specification ─────────────────────────────────────────────────────────────────────────
+## Delimiter: &quot;\t&quot;
+## chr (6): Kids_First_Biospecimen_ID, Kids_First_Participant_ID, match_id, sam...
+## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<p>Get number of samples by MB SHH subtype</p>
+<pre class="r"><code>table(subtypes$molecular_subtype)</code></pre>
+<pre><code>## 
+##              PB, Group 1 PB, Group 1 + DROSHA GPV              PB, Group 2 
+##                        5                        1                        3 
+##            PB, MYC/FOXR2 
+##                        4</code></pre>
+<p>Load methylation data and filter for ids in
+<code>mb_shh_subtypes</code></p>
+<pre class="r"><code>methyl &lt;- readRDS(methyl_file)
+pineo_methyl &lt;- methyl[,colnames(methyl) %in% c(&quot;Probe_ID&quot;, subtypes$Kids_First_Biospecimen_ID)]
 
-pb_methyl_df &lt;- pb_methy_with_subtype %&gt;% 
-  bind_rows(pb_methy_without_subtype) %&gt;% 
-  select(match_id, molecular_subtype, molecular_subtype_methyl)</code></pre>
-</div>
-<div id="assign-the-molecular-subtypes-to-all-samples-based-on-the-methylation-results" class="section level2">
-<h2>assign the molecular subtypes to all samples based on the
-methylation results</h2>
-<pre class="r"><code>pb_meta_with_mol &lt;- pb_meta %&gt;%
-  select(-molecular_subtype_methyl, -molecular_subtype) %&gt;%
-  left_join(pb_methyl_df, by = &quot;match_id&quot;) %&gt;% 
-  select(Kids_First_Biospecimen_ID, Kids_First_Participant_ID, match_id, sample_id, molecular_subtype_methyl, molecular_subtype) %&gt;% 
-  ## Assign samples without subtype as &quot;PB, To be classified&quot;
-  mutate(molecular_subtype = case_when(is.na(molecular_subtype) ~ &quot;PB, To be classified&quot;, 
-                                       TRUE ~ molecular_subtype)) %&gt;%
-  arrange(match_id) %&gt;%
-  write_tsv(file.path(result_dir, &quot;pineo-molecular-subtypes.tsv&quot;))
+pineo_methyl &lt;- pineo_methyl %&gt;%
+  distinct(Probe_ID, .keep_all = TRUE) %&gt;%
+  column_to_rownames(&quot;Probe_ID&quot;)</code></pre>
+<p>Identify 20k most variable probes among MB samples</p>
+<pre class="r"><code>methyl_var &lt;- apply(pineo_methyl, 1, var, na.rm = TRUE)
+var_probes &lt;- names(sort(methyl_var, decreasing = TRUE)[1:20000])</code></pre>
+<p>Generate UMAP results</p>
+<pre class="r"><code>set.seed(2024)
+# neighbors needs to be low because the sample size is very low right now
+umap_results &lt;- umap::umap(t(pineo_methyl[var_probes, ]), n_neighbors = 5)
 
-# do all bs ids have unique subtypes?
-length(unique(pb_meta_with_mol$Kids_First_Biospecimen_ID)) == nrow(pb_meta_with_mol)</code></pre>
-<pre><code>## [1] TRUE</code></pre>
-</div>
-<div id="session-info" class="section level2">
-<h2>session info</h2>
+umap_plot_df &lt;- data.frame(umap_results$layout) %&gt;%
+  tibble::rownames_to_column(&quot;Kids_First_Biospecimen_ID&quot;) %&gt;%
+  left_join(subtypes)</code></pre>
+<pre><code>## Joining with `by = join_by(Kids_First_Biospecimen_ID)`</code></pre>
+<p>Plot UMAP with molecular subtype and age range</p>
+<pre class="r"><code>umap_pineo &lt;-  ggplot(umap_plot_df, aes(x = X1, 
+             y = X2,
+             fill = molecular_subtype_methyl)) +
+  geom_point(alpha = 0.8, size = 3.5, shape = 21, stroke = 0.8, color = &quot;black&quot;) +
+  labs(fill = &quot;Molecular subtype&quot;) +
+  theme_bw() +
+  xlab(&quot;UMAP1&quot;) +
+  ylab(&quot;UMAP2&quot;) +
+  theme_Publication() 
+
+ggsave(file.path(plots_dir, &quot;umap_pineo.pdf&quot;),
+       umap_pineo,
+       width = 7, height = 3.5)</code></pre>
+<p>Save session info</p>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.4.0 (2024-04-24)
 ## Platform: x86_64-pc-linux-gnu
@@ -513,26 +476,38 @@ length(unique(pb_meta_with_mol$Kids_First_Biospecimen_ID)) == nrow(pb_meta_with_
 ## tzcode source: system (glibc)
 ## 
 ## attached base packages:
-## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## [1] grid      stats     graphics  grDevices utils     datasets  methods  
+## [8] base     
 ## 
 ## other attached packages:
-##  [1] lubridate_1.9.3 forcats_1.0.0   stringr_1.5.1   dplyr_1.1.4    
-##  [5] purrr_1.0.2     readr_2.1.5     tidyr_1.3.1     tibble_3.2.1   
-##  [9] ggplot2_3.5.1   tidyverse_2.0.0
+##  [1] ggthemes_5.1.0  patchwork_1.2.0 ggpubr_0.6.0    gdata_3.0.0    
+##  [5] devtools_2.4.5  usethis_2.2.3   umap_0.2.10.0   lubridate_1.9.3
+##  [9] forcats_1.0.0   stringr_1.5.1   dplyr_1.1.4     purrr_1.0.2    
+## [13] readr_2.1.5     tidyr_1.3.1     tibble_3.2.1    ggplot2_3.5.1  
+## [17] tidyverse_2.0.0
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] bit_4.0.5         gtable_0.3.5      jsonlite_1.8.8    crayon_1.5.2     
-##  [5] compiler_4.4.0    tidyselect_1.2.1  parallel_4.4.0    jquerylib_0.1.4  
-##  [9] scales_1.3.0      yaml_2.3.8        fastmap_1.2.0     R6_2.5.1         
-## [13] generics_0.1.3    knitr_1.46        rprojroot_2.0.4   munsell_0.5.1    
-## [17] bslib_0.7.0       pillar_1.9.0      tzdb_0.4.0        rlang_1.1.3      
-## [21] utf8_1.2.4        stringi_1.8.4     cachem_1.1.0      xfun_0.44        
-## [25] sass_0.4.9        bit64_4.0.5       timechange_0.3.0  cli_3.6.2        
-## [29] withr_3.0.0       magrittr_2.0.3    digest_0.6.35     grid_4.4.0       
-## [33] vroom_1.6.5       hms_1.1.3         lifecycle_1.0.4   vctrs_0.6.5      
-## [37] evaluate_0.23     glue_1.7.0        fansi_1.0.6       colorspace_2.1-0 
-## [41] rmarkdown_2.27    tools_4.4.0       pkgconfig_2.0.3   htmltools_0.5.8.1</code></pre>
-</div>
+##  [1] tidyselect_1.2.1  farver_2.1.2      fastmap_1.2.0     promises_1.3.0   
+##  [5] digest_0.6.35     timechange_0.3.0  mime_0.12         lifecycle_1.0.4  
+##  [9] ellipsis_0.3.2    magrittr_2.0.3    compiler_4.4.0    rlang_1.1.3      
+## [13] sass_0.4.9        tools_4.4.0       utf8_1.2.4        yaml_2.3.8       
+## [17] knitr_1.46        ggsignif_0.6.4    labeling_0.4.3    askpass_1.2.0    
+## [21] htmlwidgets_1.6.4 bit_4.0.5         pkgbuild_1.4.4    reticulate_1.37.0
+## [25] pkgload_1.3.4     abind_1.4-5       miniUI_0.1.1.1    withr_3.0.0      
+## [29] fansi_1.0.6       urlchecker_1.0.1  profvis_0.3.8     xtable_1.8-4     
+## [33] colorspace_2.1-0  scales_1.3.0      gtools_3.9.5      cli_3.6.2        
+## [37] crayon_1.5.2      rmarkdown_2.27    ragg_1.3.2        generics_0.1.3   
+## [41] remotes_2.5.0     RSpectra_0.16-1   tzdb_0.4.0        sessioninfo_1.2.2
+## [45] cachem_1.1.0      parallel_4.4.0    vctrs_0.6.5       Matrix_1.7-0     
+## [49] jsonlite_1.8.8    carData_3.0-5     car_3.1-2         hms_1.1.3        
+## [53] bit64_4.0.5       rstatix_0.7.2     systemfonts_1.1.0 jquerylib_0.1.4  
+## [57] glue_1.7.0        stringi_1.8.4     gtable_0.3.5      later_1.3.2      
+## [61] munsell_0.5.1     pillar_1.9.0      htmltools_0.5.8.1 openssl_2.2.0    
+## [65] R6_2.5.1          textshaping_0.3.7 rprojroot_2.0.4   vroom_1.6.5      
+## [69] evaluate_0.23     shiny_1.8.1.1     lattice_0.22-6    png_0.1-8        
+## [73] backports_1.4.1   memoise_2.0.1     broom_1.0.6       httpuv_1.6.15    
+## [77] bslib_0.7.0       Rcpp_1.0.12       xfun_0.44         fs_1.6.4         
+## [81] pkgconfig_2.0.3</code></pre>
 
 
 
